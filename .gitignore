@@ -2,3 +2,14 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# ignore dataset folder and subfolders
+00_raw_data/
+01_tidy_data/
+03_plots/
+
+# other file types
+*.pptx
+*.html
+*.bib
+*.txt
