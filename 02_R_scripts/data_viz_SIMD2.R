@@ -6,11 +6,15 @@
 library(dplyr)
 library(readr)
 library(ggplot2)
-library(rgdal)
-library(broom)
+# library(rgdal)
+# library(broom)
 library(showtext)
 library(ggtext)
 library(ggridges)
+library(sf)
+library(geofacet)
+library(rnaturalearth)
+library(patchwork)
 
 
 # 1. Set fonts----
@@ -24,12 +28,12 @@ showtext_auto()
 
 # 2. Plot size----
 gg_record(
-  dir = file.path(tempdir(),"recording"), 
-  device = "png", 
-  width = 20, 
-  height = 20, 
-  units = "cm", 
-  dpi = 300 
+  dir = file.path(tempdir(),"recording"),
+  device = "png",
+  width = 20,
+  height = 20,
+  units = "cm",
+  dpi = 300
 )
 
 
@@ -113,19 +117,22 @@ tt_data_la_po_tt_summary <- tt_data_la_po %>%
   na.omit() %>% 
   ungroup()
 
+# 4. Map prep----
+# *4.1 nhs boards----
 # nhs boards map prep
 # https://spatialdata.gov.scot/geonetwork/srv/eng/catalog.search#/metadata/f12c3826-4b4b-40e6-bf4f-77b9ed01dc14
 # or (download Shapefiles from https://www.data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards-scotland)
 map_nhs <- sf::read_sf('./00_raw_data/SG_NHS_HealthBoards_2019/SG_NHS_HealthBoards_2019.shp')
 
+# *4.2 local authority council----
 # local authority map prep map
 # https://data.spatialhub.scot/dataset/local_authority_boundaries-is
 map_local_authority <- sf::read_sf('./00_raw_data/Local_Authority_Boundaries_-_Scotland-sh_las_pub_las/pub_las.shp')
 
 # need some values to map - number of post offices per population?
 
-# population estimates
-# health board population estimates
+# *4.3 population estimates nhs health boards----
+
 # https://www.opendata.nhs.scot/dataset/population-estimates/resource/27a72cc8-d6d8-430c-8b4f-3109a9ceadb1
 # select 2021 population estimates
 health_board_pop <- read_csv('./00_raw_data/health_board_population_estimates.csv') %>% 
@@ -149,7 +156,7 @@ map_nhs_pop_po_tt <- map_nhs %>%
 ggplot(map_nhs_pop_po_tt, aes(fill = mean_tt))+
   geom_sf()
 
-# local authority population estimates
+# *4.4 population estimates local authority council areas----
 # https://www.opendata.nhs.scot/dataset/population-estimates/resource/09ebfefb-33f4-4f6a-8312-2d14e2b02ace
 # select 2021 population estimates
 local_authority_pop <- read_csv('./00_raw_data/local_authority_population_estimate.csv') %>% 
@@ -173,7 +180,9 @@ map_local_authority_pop_po_tt <- map_local_authority %>%
 ggplot(map_local_authority_pop_po_tt, aes(fill = mean_tt))+
   geom_sf()
 
+# *4.5 mean travel time gradient classes for maps---- 
 # max(map_nhs_pop_po_tt$mean_tt)
+
 # transform the gradient into value classes and plot the results in an appropriate way
 # Create classes
 clean_nhs_tt <- map_nhs_pop_po_tt %>%
@@ -198,27 +207,32 @@ clean_la_tt <- map_local_authority_pop_po_tt %>%
     TRUE ~ "7"
   ))
 
-# 4. Set color palettes----
+# *4.6 Set color palettes----
 
 pal_po <- c("#a23339","#ee9b00","#e9d8a6","#94d2bd","#0a9396","#21435f")
 
 pal_po_la <- c('#fef0d9','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#990000')
 
-# Set color background
+# *4.7 Set color background----
 
 bck_po <- "#d6d2c4"
 
-# Set theme 
+# *4.8 Set theme---- 
 theme_custom <- theme_void()+
   theme(
     plot.margin = margin(1,1,10,1,"pt"),
-    plot.background = element_rect(fill=bck,color=NA),
+    plot.background = element_rect(fill=bck_po,color=NA),
     legend.position = "bottom",
     legend.title = element_text(hjust=0.5,color="white",face="bold"),
     legend.text = element_text(color="white")
   )
 
-# Make choropleth
+# 5. Make chloropeth maps----
+# LEGO plots inspired by BjnNowak
+# https://r-graph-gallery.com/web-choropleth-map-lego-style.html
+# https://github.com/BjnNowak/TidyTuesday/blob/main/SC_Sport.R
+
+# *5.1 initial nhs chloropeth----
 ggplot(clean_nhs_tt, aes(fill=clss))+
   geom_sf()+
   labs(fill="Member of a sport association")+
@@ -230,13 +244,14 @@ ggplot(clean_nhs_tt, aes(fill=clss))+
     )
   )+
   scale_fill_manual(
-    values=pal,
+    values=pal_po,
     label=c("< 8 min","< 9 min","< 10 min","< 11 min","< 12 min", "≥ 12 min")
   )+
   theme_custom
 
-# Make grid
-# nhs
+
+# *5.2 Make NHS grid----
+
 grd_nhs_tt <- st_make_grid(
   clean_nhs_tt, # map name 
   n = c(60,60) # number of cells per longitude/latitude
@@ -247,7 +262,7 @@ grd_nhs_tt <- st_make_grid(
   # (will be useful later to get back centroids data)
   mutate(id=row_number())
 
-# Extract centroids
+# *5.3 Extract NHS centroids----
 cent_nhs_tt <- grd_nhs_tt %>%
   st_centroid()
 
@@ -271,6 +286,7 @@ grd_nhs_tt_clean <- grd_nhs_tt %>%
   #filter(id%in%sel)%>%
   left_join(cent_nhs_tt_no_geom)
 
+# *5.4 Make local authority grid----
 # local authority
 grd_la_tt <- st_make_grid(
   clean_la_tt, # map name 
@@ -282,7 +298,7 @@ grd_la_tt <- st_make_grid(
   # (will be useful later to get back centroids data)
   mutate(id=row_number())
 
-# Extract centroids
+# *5.5 Extract local authority centroids----
 cent_la_tt <- grd_la_tt %>%
   st_centroid()
 
@@ -306,13 +322,14 @@ grd_la_tt_clean <- grd_la_tt %>%
   #filter(id%in%sel)%>%
   left_join(cent_la_tt_no_geom)
 
-# 5. Make final maps----
+# 6. Make final LEGO maps----
 # make the map, combining the choropleth and the grid above
-# *5.1 nhs board area----
+
+# *6.1 nhs board area----
 p1 <- ggplot() +
   geom_sf(
     # drop_na() is one way to suppress the cells outside the country
-    grd_nhs_tt_clean %>% drop_na(), 
+    grd_nhs_tt_clean %>% tidyr::drop_na(), 
     mapping = aes(geometry = geometry, fill = clss)
   ) +
   geom_sf(cent_nhs_tt_clean, mapping = aes(geometry = geometry), fill=NA, pch=21, size=0.5) +
@@ -360,20 +377,20 @@ p1 <- ggplot() +
 
 ggsave('./03_plots/nhs_boards_po_plot1.png', dpi = 300, height = 20, width = 15, units = 'cm')
 
-gg_playback(
-  name = file.path(tempdir(), "recording", "post_office_lego_gif.gif"),
-  first_image_duration = 5,
-  last_image_duration = 15,
-  frame_duration = .4,
-  image_resize = 400,
-  last_as_first = TRUE
-)
+# gg_playback(
+#   name = file.path(tempdir(), "recording", "post_office_lego_gif.gif"),
+#   first_image_duration = 5,
+#   last_image_duration = 15,
+#   frame_duration = .4,
+#   image_resize = 400,
+#   last_as_first = TRUE
+# )
 
-# *5.2 local authority area----
+# *6.2 local authority area----
 ggplot() +
   geom_sf(
     # drop_na() is one way to suppress the cells outside the country
-    grd_la_tt_clean %>% drop_na(), 
+    grd_la_tt_clean %>% tidyr::drop_na(), 
     mapping = aes(geometry = geometry, fill = clss)
   ) +
   geom_sf(cent_la_tt_clean, mapping = aes(geometry = geometry), fill=NA, pch=21, size=0.5) +
@@ -422,14 +439,13 @@ ggplot() +
 ggsave('./03_plots/la_boards_po_plot1.png', dpi = 300, height = 20, width = 15, units = 'cm')
 
 
-# 6. NHS Boards facetted plots Rural/Urban----
-# 
-# # travel time(tt)
-# # data from https://statistics.gov.scot/data/scottish-index-of-multiple-deprivation---geographic-access-to-services-indicators
-# 
+# 7. NHS Boards facetted plots Rural/Urban----
+# travel time(tt)
+# data from https://statistics.gov.scot/data/scottish-index-of-multiple-deprivation---geographic-access-to-services-indicators
+
 tt_data <- read_csv('./00_raw_data/geo_access_services.csv') %>%
   rename(travel_type = 'Method of Travel')
-# 
+
 # postcode lookup file - sheet 2 from https://www.gov.scot/publications/scottish-index-of-multiple-deprivation-2020v2-postcode-look-up/
 postcodes <- read_csv('./00_raw_data/postcodes.csv')
 
@@ -462,26 +478,6 @@ tt_data_po_lat_long <- tt_data_po %>%
   left_join(lat_long %>% group_by(Postcode) %>% dplyr::mutate(id = row_number())) %>%
   select(-id) %>%
   ungroup()
-# 
-# # try to associate postcodes with regions (health boards?)
-# # 2023-2 Scottish Postcode Directory Files has links between post codes and numerical values of health boards
-# # also breaks down postcodes by PostcodeDistrict and PostcodeSector
-# # https://www.nrscotland.gov.uk/statistics-and-data/geography/our-products/scottish-postcode-directory/2023-2
-# # download 'LargeUser.csv' dataset
-# # import this file
-# 
-# hb <- read_csv('./00_raw_data/SmallUser.csv') %>% 
-#   select(1:3, 18)
-# 
-# table(hb$HealthBoardArea1995Code)
-# 
-# # merge the hb data with the tt_data_po_lat_long dataset based on common Postcodes variable
-# 
-# tt_data_po_lat_long_hb <- tt_data_po_lat_long %>%
-#   group_by(Postcode) %>% dplyr::mutate(id = row_number()) %>% 
-#   left_join(hb %>% group_by(Postcode) %>% dplyr::mutate(id = row_number())) %>% 
-#   select(-id) %>%
-#   ungroup()
 
 tt_data_po_lat_long_hb_2019 <- tt_data_po_lat_long %>%
   group_by(Postcode) %>% dplyr::mutate(id = row_number()) %>%
@@ -586,36 +582,9 @@ tt_data_po_lat_long_la_2019_cleaned <- tt_data_po_lat_long_la_2019 %>%
                                                       'Very remote small town', 'Remote small town', 'Small town',
                                                       'Urban')))
 
-table(tt_data_po_lat_long_la_2019_cleaned$CouncilArea2019Code)
-test_data <- tt_data_po_lat_long_la_2019_cleaned %>% 
-  filter(CouncilArea2019Code == 'S12000048')
-
-# 7. Ridge plots----
+# 8. Ridge plots----
 # https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html
-
 # https://www.youtube.com/watch?v=VgIlwMpUsBQ
-
-setwd("/Users/Allan/Documents/data_viz_SIMD2/04_gifs")
-
-gg_record(
-  dir = 'ridge_img',
-  device = "png",
-  dpi = 300, 
-  width = 16, 
-  height = 9, 
-  units = 'cm'
-)
-
-
-ggplot(mtcars, aes(x = mpg, y = hp)) +
-  geom_point()
-
-ggplot(mtcars, aes(x = mpg, y = hp)) + 
-  geom_point(aes(color = as.factor(gear)))
-
-ggplot(mtcars, aes(x = mpg, y = hp)) + 
-  geom_point(aes(color = as.factor(gear))) +
-  geom_path()
 
 ridge_hb_plot <- ggplot(tt_data_po_lat_long_hb_2019_cleaned, aes(y = rural_urban, x = Value,  fill = rural_urban)) +
   geom_density_ridges(alpha = 0.6) +
@@ -627,6 +596,8 @@ ridge_hb_plot <- ggplot(tt_data_po_lat_long_hb_2019_cleaned, aes(y = rural_urban
     legend.position = "none") +
   facet_geo(~ Area, grid = "nhs_scot_grid")
 
+ridge_hb_plot
+
 # https://icolorpalette.com/download/palette/534946_color_palette.jpg
 
 p2 <- ggplot(tt_data_po_lat_long_hb_2019_cleaned, aes(y = rural_urban, x = Value)) +
@@ -635,194 +606,37 @@ p2 <- ggplot(tt_data_po_lat_long_hb_2019_cleaned, aes(y = rural_urban, x = Value
   scale_y_discrete(expand = c(0, 0)) +
   scale_fill_manual(values = c("#549b16", "#9be65a", "#c1f098", "#806c32", "#bfa65d", "#ddd0aa","#565a5c")) +
   coord_cartesian(clip = "off") +
-  theme_ridges(grid = FALSE, center_axis_labels = TRUE, font_size = 24) +
+  theme_ridges(grid = FALSE, center_axis_labels = TRUE, font_size = 12) +
   theme(
     legend.position = "none",
     plot.background = element_rect(fill = '#c0cdbb', color = NA),
     strip.text = element_text(face = "bold", color = "chartreuse4",
-                              hjust = 0, size = 24),
+                              hjust = 0, size = 12),
     strip.background = element_rect(fill = "#c0cdbb")) +
   facet_geo(~ Area, grid = "nhs_scot_grid") +
-  labs(y= "", x = "minutes") 
+  labs(y= "", x = "minutes"
+  )
 
+p2 
+ggsave('./03_plots/nhs_boards_facet_ridge_plot2.png', dpi = 300, height = 30, width = 24, units = 'cm')
 
-ggsave('./03_plots/nhs_boards_facet_ridge_plot2.png', dpi = 300, height = 20, width = 16, units = 'cm')
+# 9. rnaturalearth map of scotland----
+# https://luisdva.github.io/rstats/mapssf-eng/
 
-p1 + p2
+scotland <- ne_countries(geounit = "scotland", type = "map_units", returnclass = "sf", scale = "low")
 
-tt_data_po_lat_long_la_2019_cleaned %>% 
-  ggplot(aes(y = rural_urban, x = Value,  fill = rural_urban)) +
-  geom_density_ridges(alpha = 0.6) +
-  scale_x_continuous(expand = c(0, 0)) +
-  scale_y_discrete(expand = c(0, 0)) +
-  coord_cartesian(clip = "off") +
-  theme_ridges(grid = FALSE, center_axis_labels = TRUE) +
+p3 <- ggplot() +
+  geom_sf(data=scotland)+
+  #geom_sf(data=pts,aes(shape=sp,color=sp))+
   theme(
-    legend.position = "none",
-    plot.background = element_rect(fill = 'khaki3', color = NA)) +
-  facet_geo(~ Area, grid = "scotland_local_authority_grid1")
+        panel.grid = element_line(colour = 'transparent'), 
+        line = element_blank(), 
+        rect = element_blank())
 
-ggsave('./03_plots/local_authority_facet_ridge_plot2.png', dpi = 300, height = 16, width = 9, units = 'cm')
+#p2 + inset_element(p3, left = 0, bottom = 0.6, right = 0.4, top = 1, align_to = 'full')
 
-gg_stop_recording()
+ggsave('./03_plots/scotmap__facet_ridge_plot2.png', dpi = 300, height = 24, width = 20, units = 'cm')
 
-gg_playback(
-  first_image_duration = 5
-)
-
-
-geom_density_ridges() +
-  theme_ridges() + 
-  theme(legend.position = "none")
-
-# summarise travel time to NHS board area and rural/urban
-tt_nhs_board_rural_urban_summarise <- tt_data_po_lat_long_hb_2019_cleaned %>% 
-  group_by(Area, rural_urban) %>% 
-  summarise(mean_tt = mean(Value)) %>% 
-  ungroup()
-
-# 
-# # https://www.opendata.nhs.scot/mn_MN/dataset/geography-codes-and-labels/resource/d1fd7380-ffd9-4854-ab2c-574c266085df?view_id=cbbe9fef-9766-4591-b55a-c34b666d3195
-# 
-# tt_data_po_lat_long_hb_cleaned <- tt_data_po_lat_long_hb %>% 
-#   na.omit() %>% 
-#   mutate(Area = case_when(HealthBoardArea1995Code == '01' ~ 'Highland',
-#                           HealthBoardArea1995Code == '02' ~ 'Grampian',
-#                           HealthBoardArea1995Code == '03' ~ 'Tayside',
-#                           HealthBoardArea1995Code == '04' ~ 'Fife',
-#                           HealthBoardArea1995Code == '05' ~ 'Lothian',
-#                           HealthBoardArea1995Code == '06' ~ 'Borders',
-#                           HealthBoardArea1995Code == '07' ~ 'Forth Valley',
-#                           HealthBoardArea1995Code == '08' ~ 'Argyll and Clyde',
-#                           HealthBoardArea1995Code == '09' ~ 'Greater Glasgow',
-#                           HealthBoardArea1995Code == '10' ~ 'Lanarkshire',
-#                           HealthBoardArea1995Code == '11' ~ 'Ayrshire and Arran',
-#                           HealthBoardArea1995Code == '12' ~ 'Dumfries and Galloway',
-#                           HealthBoardArea1995Code == '13' ~ 'Orkney',
-#                           HealthBoardArea1995Code == '14' ~ 'Shetland',
-#                           HealthBoardArea1995Code == '15' ~ 'Western Isles',
-#                           TRUE ~ 'NA')) %>% 
-#   select(-c(3:6)) %>% 
-#   rename(rural_urban = 'Rural/urban classification') %>% 
-#   mutate_at(c('Latitude', 'Longitude'), as.numeric)
-# 
-# glimpse(tt_data_po_lat_long_hb_cleaned)
-# 
-# # summarise to Postcode district
-# 
-# pc_district <- tt_data_po_lat_long_hb_cleaned %>%
-#   group_by(PostcodeDistrict) %>% 
-#   mutate(latitude_mean = mean(Latitude), longitude_mean = mean(Longitude)) %>% 
-#   ungroup() %>% 
-#   select(1, 3, 5, 11, 12, 15:17)
-# 
-# colnames(pc_district)
-# glimpse(pc_district)
-# 
-# pc_district_summary <- pc_district %>%
-#   group_by(PostcodeDistrict, Area, travel_type, rural_urban, latitude_mean, longitude_mean) %>% 
-#   summarise(district_mean = mean(Value)) %>% 
-#   ungroup() %>% 
-#   mutate_if(is.character, factor)
-# 
-# pc_district_summary_plot <- pc_district_summary %>%
-#   rename(name = Area) %>% 
-#   #slice(1:100) %>% 
-#   group_by(PostcodeDistrict) %>% 
-#   #filter(FeatureCode %in% c('S01012716', 'S01009070')) %>% 
-#   #mutate(x=1, y=1) %>% 
-#   ggplot() +
-#   #geom_point(shape="\u2620", size = 10, family = "Arial Unicode MS")
-#   geom_point(aes(x = longitude_mean, y = latitude_mean, size = district_mean, shape= rural_urban, colour = rural_urban), position = 'jitter') +
-#   scale_shape_manual(values = c(22, 22, 22, 22, 22, 22, 22, 22)) +
-#   scale_color_manual(values = c("Accessible rural area" = "#8c510a", "Accessible small town" = "#bf812d",
-#                                 "Large urban area" = "#dfc27d", "Other urban area" = "#f6e8c3",
-#                                 "Remote rural area" = "#c7eae5", "Remote small town" = "#80cdc1",
-#                                 "Very remote rural area" = "#35978f", "Very remote small town" = "#01665e")) +
-#   scale_x_continuous(expand=c(0,0)) + 
-#   scale_y_continuous(expand=c(0,0)) +
-#   theme(axis.line=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.text.y=element_blank(),
-#         axis.ticks=element_blank(),
-#         axis.title.x=element_blank(),
-#         axis.title.y=element_blank(),
-#         legend.position="none",
-#         panel.background=element_blank(),
-#         panel.border=element_blank(),
-#         panel.grid.major=element_blank(),
-#         panel.grid.minor=element_blank(),
-#         plot.background=element_blank()) 
-# 
-# 
-# pc_district_summary_plot_facet_geo <- pc_district_summary %>% 
-#   group_by(Area, rural_urban) %>% 
-#   summarise(NHS_area_mean = mean(district_mean)) %>% 
-#   ggplot(aes(rural_urban, NHS_area_mean, fill = rural_urban)) +
-#   geom_col() +
-#   coord_flip() +
-#   theme_bw() 
-# 
-# #+
-# facet_geo(~ state)
-# 
-# 
-# 
-# pc_district_summary_plot
-# 
-# pc_district_summary_plot_facet_geo
-# 
-# ??facet_warp
-# 
-# pc_district_summary_plot_facet <- pc_district_summary_plot +
-#   facet_wrap(~PostcodeDistrict)
-# 
-# pc_district_summary_plot_facet
-# 
-# min(tt_data_po$Value)
-# 
-# tt_data_po_sliced <- tt_data_po %>% 
-#   slice(1:100) %>%
-#   rename(travel_type = 'Method of Travel') %>% 
-#   #mutate(travel_type = factor(travel_type, levels = c('Car', 'Public Transport'))) %>% 
-#   mutate_if(is.character, factor)
-# 
-# glimpse(tt_data_po_sliced)
-# table(tt_data_po_sliced$FeatureName)
-# colnames(tt_data_po_sliced)
-# 
-# tt_data_po_sliced_plot <- tt_data_po_sliced %>%
-#   select(1, 2, 7, 9) %>%
-#   group_by(FeatureCode) %>% 
-#   #filter(FeatureCode %in% c('S01012716', 'S01009070')) %>% 
-#   mutate(x=1, y=1) %>% 
-#   ggplot() +
-#   #geom_point(shape="\u2620", size = 10, family = "Arial Unicode MS")
-#   geom_point(aes(x = x, y = y, size = Value, colour = travel_type), alpha = 0.5)+
-#   scale_color_manual(values = c("Car" = "#c41c22", "Public Transport" = "grey30")) +
-#   scale_x_continuous(expand=c(0,0)) + 
-#   scale_y_continuous(expand=c(0,0)) +
-#   theme(axis.line=element_blank(),
-#         axis.text.x=element_blank(),
-#         axis.text.y=element_blank(),
-#         axis.ticks=element_blank(),
-#         axis.title.x=element_blank(),
-#         axis.title.y=element_blank(),
-#         legend.position="none",
-#         panel.background=element_blank(),
-#         panel.border=element_blank(),
-#         panel.grid.major=element_blank(),
-#         panel.grid.minor=element_blank(),
-#         plot.background=element_blank())
-# 
-# tt_data_po_sliced_plot
-# 
-# tt_data_po_sliced_plot_facet <- tt_data_po_sliced_plot +
-#   facet_wrap(~FeatureName)
-# 
-# tt_data_po_sliced_plot_facet
-# 
-# ggsave(tt_data_po_sliced_plot, filename = "./03_plots/tt_data_po_sliced_plot1.png", dpi = 300, type = "cairo")  
 
 
 
