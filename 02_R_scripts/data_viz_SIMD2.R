@@ -15,6 +15,8 @@ library(sf)
 library(geofacet)
 library(rnaturalearth)
 library(patchwork)
+library(ggpubr)
+library(jpeg)
 
 
 # 1. Set fonts----
@@ -24,6 +26,9 @@ font_add_google("Fira Sans","fira")
 font_add_google("Raleway","ral")
 font_add_google("Bitter","bit")
 font_add_google("Roboto", "roboto")
+font_add_google("Anton", "anton")
+font_add_google("Ultra", "ultra")
+font_add_google("Abril Fatface", "abril")
 showtext_auto()
 
 # 2. Plot size----
@@ -624,20 +629,200 @@ ggsave('./03_plots/nhs_boards_facet_ridge_plot2.png', dpi = 300, height = 30, wi
 # 9. rnaturalearth map of scotland----
 # https://luisdva.github.io/rstats/mapssf-eng/
 
-scotland <- ne_countries(geounit = "scotland", type = "map_units", returnclass = "sf", scale = "low")
+scotland <- ne_countries(geounit = "scotland", type = "map_units", returnclass = "sf", scale = "small")
+st_centroid(scotland)
+# centroid -4.1 lon, 56.6 lat
+
+#scotland
 
 p3 <- ggplot() +
-  geom_sf(data=scotland)+
+  geom_sf(data=scotland, lwd = 4, colour = '#DCD8EA', fill = '#0439E3') +
+  coord_sf(xlim = c(-8, 0), ylim = c(54, 59.5)) +
   #geom_sf(data=pts,aes(shape=sp,color=sp))+
-  theme(
+  theme(panel.background = element_rect(fill = "#FE851E"),
         panel.grid = element_line(colour = 'transparent'), 
         line = element_blank(), 
-        rect = element_blank())
+        rect = element_blank()) + 
+  coord_sf(crs  = "+proj=laea +x_0=0 +y_0=0 +lon_0 = -35 +lat_0 = 56.6")
+
+p3
+
+theme(panel.background = element_rect(fill = "#8088d0"),
+      panel.grid = element_line(size = 0.1))
 
 #p2 + inset_element(p3, left = 0, bottom = 0.6, right = 0.4, top = 1, align_to = 'full')
 
 ggsave('./03_plots/scotmap__facet_ridge_plot2.png', dpi = 300, height = 24, width = 20, units = 'cm')
 
+coordinates_ayr <- data.frame(
+  place = 'AYR TOON',
+  longitude = -4.629,
+  latitude = 55.458
+)
+
+coordinates_sf_ayr <- coordinates_ayr |>  sf::st_as_sf(coords = c("longitude","latitude"), crs = 4326)
+
+# 9.1* Irn Bru----
+p_bru1 <- ggplot() +
+  geom_sf(data=scotland, lwd = 4, colour = '#DCD8EA', fill = '#0439E3') +
+  theme(panel.background = element_rect(fill = "#FE851E"),
+        panel.grid = element_line(colour = 'transparent'), 
+        line = element_blank(), 
+        rect = element_blank(),
+        #axis.text.x = element_blank(),
+        #axis.text.y = element_blank(),
+        axis.ticks = element_blank()) +
+  geom_sf(data = coordinates_sf_ayr, size = 4, pch=21, stroke = 2, fill = 'grey30') +
+  geom_sf_text(data = coordinates_sf, aes(label = place), nudge_x = 1.1, nudge_y = 0.25, colour = '#FE851E', family = 'anton', size = 5) +
+  coord_sf(xlim = c(-7.5, -0.5), ylim = c(54, 59.5)) 
+
+p_bru1
+#+ coord_sf(crs  = "+proj=laea +x_0=0 +y_0=0 +lon_0 = -35 +lat_0 = 56.6")
+
+# 9.2* Tunnocks----
+# Import the image
+
+mallow <- '#f5ebec'
+chocolate <- '#7B3F00'
+dark_chocolate <- '#352728'
+
+img <- readJPEG('./00_raw_data/tunnocks_t_cake_cropped3.jpg')
+
+coordinates_lewis_hamilton <- data.frame(
+  place = c('LEWIS', 'HAMILTON'),
+  longitude = c(-6.6616, -4.0323),
+  latitude = c(58.2416, 55.7754)
+)
+
+coordinates_sf_lewis_hamilton <- coordinates_lewis_hamilton |>  sf::st_as_sf(coords = c("longitude","latitude"), crs = 4326)
+
+p_tunn1 <- ggplot() +
+  background_image(img) +
+  geom_sf(data=scotland, lwd = 4, colour = chocolate, fill = mallow) +
+  theme(panel.grid = element_line(colour = 'transparent'), 
+        line = element_blank(), 
+        rect = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank()) +
+  geom_sf(data = coordinates_sf_lewis_hamilton, size = 10, pch=21, stroke = 3, fill = '#EE1A2E', colour = '#FFE404') +
+  #geom_sf_text(data = coordinates_sf_lewis_hamilton, aes(label = place), nudge_x = 0.5, nudge_y = 0.5, colour = '#DCD8EA', family = 'anton', size = 10) +
+  geom_sf_label(data = coordinates_sf_lewis_hamilton, aes(label = place), nudge_x = 0.3, nudge_y = 0.55, family = 'ultra', colour = '#EE1A2E', fill = '#FFE404', size = 5, label.size = 0.5) +
+  coord_sf(xlim = c(-7.5, -0.5), ylim = c(54, 59.5)) 
+
+p_tunn1
+
+# Plot with background image
+ggplot(iris, aes(Species, Sepal.Length))+
+  background_image(img)+
+  geom_boxplot(aes(fill = Species), color = "white")+
+  fill_palette("jco")
 
 
+# 9.3* Tennents----
+
+coordinates_tennents <- data.frame(
+  place = c('T','T', 'T', 'T', 'T'),
+  longitude = c(-3.7, -2.7196, -2.0076, -3.0689, -5),
+  latitude = c(54.65, 56.0584, 57.6934, 58.6373, 58.65)
+)
+
+coordinates_turnberry <- data.frame(
+  place = 'TURN-BERRY',
+  longitude = -4.8350,
+  latitude = 55.3113
+)
+
+
+#55.4241
+#-4.7469
+coordinates_sf_tennents <- coordinates_tennents |>  sf::st_as_sf(coords = c("longitude","latitude"), crs = 4326)
+coordinates_sf_turnberry <- coordinates_turnberry |>  sf::st_as_sf(coords = c("longitude","latitude"), crs = 4326)
+
+p_tennents1 <- ggplot() +
+  geom_sf(data=scotland, lwd = 4, colour = 'white', fill = '#B82B35') +
+  theme(panel.background = element_rect(fill = "#ECD747"),
+        panel.grid = element_line(colour = 'transparent'), 
+        line = element_blank(), 
+        rect = element_blank(),
+        #axis.text.x = element_blank(),
+        #axis.text.y = element_blank(),
+        axis.ticks = element_blank()) +
+  geom_sf(data = coordinates_sf_tennents, size = 4, pch=21, stroke = 2, fill = '#ECD747', colour = '#F6A11D') +
+  geom_sf(data = coordinates_sf_turnberry, size = 4, pch=21, stroke = 2, fill = '#ECD747', colour = '#F6A11D') +
+  geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = 'white', family = 'ultra', size = 10) +
+  geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = '#ECD747', family = 'ultra', size = 9) +
+  geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = 'black', family = 'ultra', size = 8) +
+  geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = '#B82B35', family = 'ultra', size = 7) +
+  #geom_sf_text(data = coordinates_sf_turnberry, aes(label = place), nudge_x = 0.6, nudge_y = 0.3, colour = 'black', family = 'ultra', size = 6) +
+  geom_sf_label(data = coordinates_sf_turnberry, aes(label = place), nudge_x = 0.6, nudge_y = 0.35, family = 'ultra', colour = 'black', size = 6, label.size = 0.5) +
+  coord_sf(xlim = c(-7.5, -0.5), ylim = c(54, 59.5)) 
+
+p_tennents1
+
+
+# 9.4* Glenfiddich----
+
+# get the bounding box of points ------------------------------------------
+# Calculate the range of longitude and latitude
+
+#get the bounding box numbers for lat long
+#scotland
+
+# Bounding box:  xmin: -6.149981 ymin: 54.60094 xmax: -1.959281 ymax: 58.635
+
+min_lon_scot <- -6.149981
+max_lon_scot <- -1.959281
+min_lat_scot <- 54.60094
+max_lat_scot <- 58.635
+
+# calculate the grid of points --------------------------------------------
+df_points_scot <- expand_grid(x = seq(from = min_lon_scot, to = max_lon_scot, length.out = 10),
+                         y = seq(from = min_lat_scot, to = max_lat_scot, length.out = 10))
+
+# get the outline of points of map ----------------------------------------
+str(scotland)
+stat_sf_coordinates(scotland)
+
+scot_outline <- scotland %>%
+  dplyr::mutate(lon = sf::st_coordinates(.)[,1],
+                lat = sf::st_coordinates(.)[,2])
+
+scot_outline <- scotland %>%
+  mutate(long = unlist(map(scotland$geometry,1)),
+         lat = unlist(map(scotland$geometry,2)))
+
+scot_outline <- setNames(data.frame(scotland[[1]], 
+                    matrix(unlist(scotland[[1]]), ncol=1, byrow=TRUE)), 
+         c( "lon", "lat"))
+
+
+
+p_glenfiddich1 <- ggplot() +
+  geom_sf(data=scotland, lwd = 4, colour = '#A02423', fill = '#52675D') +
+  theme(panel.background = element_rect(fill = "#8F3606"),
+        panel.grid = element_line(colour = 'transparent'), 
+        line = element_blank(), 
+        rect = element_blank(),
+        #axis.text.x = element_blank(),
+        #axis.text.y = element_blank(),
+        axis.ticks = element_blank())
+# #+theme(panel.background = element_rect(fill = "#ECD747"),
+#         panel.grid = element_line(colour = 'transparent'), 
+#         line = element_blank(), 
+#         rect = element_blank(),
+#         #axis.text.x = element_blank(),
+#         #axis.text.y = element_blank(),
+#         axis.ticks = element_blank()) +
+#   geom_sf(data = coordinates_sf_tennents, size = 4, pch=21, stroke = 2, fill = '#ECD747', colour = '#F6A11D') +
+#   geom_sf(data = coordinates_sf_turnberry, size = 4, pch=21, stroke = 2, fill = '#ECD747', colour = '#F6A11D') +
+#   geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = 'white', family = 'ultra', size = 10) +
+#   geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = '#ECD747', family = 'ultra', size = 9) +
+#   geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = 'black', family = 'ultra', size = 8) +
+#   geom_sf_text(data = coordinates_sf_tennents, aes(label = place), nudge_x = 0.6, nudge_y = 0.2, colour = '#B82B35', family = 'ultra', size = 7) +
+#   #geom_sf_text(data = coordinates_sf_turnberry, aes(label = place), nudge_x = 0.6, nudge_y = 0.3, colour = 'black', family = 'ultra', size = 6) +
+#   geom_sf_label(data = coordinates_sf_turnberry, aes(label = place), nudge_x = 0.6, nudge_y = 0.35, family = 'ultra', colour = 'black', size = 6, label.size = 0.5) +
+#   coord_sf(xlim = c(-7.5, -0.5), ylim = c(54, 59.5))
+
+p_glenfiddich1
 
