@@ -30,6 +30,7 @@ font_add_google("Anton", "anton")
 font_add_google("Ultra", "ultra")
 font_add_google("Abril Fatface", "abril")
 showtext_auto()
+showtext_opts(dpi = 320)
 
 # 2. Plot size----
 gg_record(
@@ -654,6 +655,10 @@ theme(panel.background = element_rect(fill = "#8088d0"),
 
 ggsave('./03_plots/scotmap__facet_ridge_plot2.png', dpi = 300, height = 24, width = 20, units = 'cm')
 
+
+
+# 9.1* Irn Bru----
+
 coordinates_ayr <- data.frame(
   place = 'AYR TOON',
   longitude = -4.629,
@@ -661,23 +666,33 @@ coordinates_ayr <- data.frame(
 )
 
 coordinates_sf_ayr <- coordinates_ayr |>  sf::st_as_sf(coords = c("longitude","latitude"), crs = 4326)
+font <- 'anton'
 
-# 9.1* Irn Bru----
 p_bru1 <- ggplot() +
   geom_sf(data=scotland, lwd = 4, colour = '#DCD8EA', fill = '#0439E3') +
   theme(panel.background = element_rect(fill = "#FE851E"),
         panel.grid = element_line(colour = 'transparent'), 
         line = element_blank(), 
         rect = element_blank(),
-        #axis.text.x = element_blank(),
-        #axis.text.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
         axis.ticks = element_blank()) +
   geom_sf(data = coordinates_sf_ayr, size = 4, pch=21, stroke = 2, fill = 'grey30') +
-  geom_sf_text(data = coordinates_sf, aes(label = place), nudge_x = 1.1, nudge_y = 0.25, colour = '#FE851E', family = 'anton', size = 5) +
-  coord_sf(xlim = c(-7.5, -0.5), ylim = c(54, 59.5)) 
-
+  #geom_sf_text(data = coordinates_sf_ayr, aes(label = place), nudge_x = 1.1, nudge_y = 0.25, colour = '#FE851E', family = 'anton', size = 5) +
+  coord_sf(xlim = c(-7.5, -0.5), ylim = c(54, 59.5)) +
+  annotate("text", y = 59.5, x = -4, label = "SCOTLAND", lineheight = 0.75, family = font,  size = 7, color = "#0439E3", vjust = 0.5) +
+  annotate("text", y = 59.1, x = -4, label = "AS A F1 GRAND PRIX CIRCUIT", lineheight = 0.75, family = font,  size = 5, color = "#0439E3", vjust = 0.5) +
+  annotate("text", y = 55.75, x = -4.4, label = "AYR", lineheight = 0.75, family = font,  size = 5, color = "#FE851E", hjust = 0) +
+  annotate("text", y = 55.45, x = -4.25, label = "TOON", lineheight = 0.75, family = font,  size = 5, color = "#FE851E", hjust = 0) +
+  annotate("text", y = 55.15, x = -4.75, label = "CENNA", lineheight = 0.75, family = font,  size = 5, color = "#FE851E", hjust = 0)
+  
 p_bru1
 #+ coord_sf(crs  = "+proj=laea +x_0=0 +y_0=0 +lon_0 = -35 +lat_0 = 56.6")
+
+# save plot ---------------------------------------------------------------
+ggsave('./03_plots/scotmap_irn_bru.png', dpi = 320, height = 12, width = 9, units = 'cm')
 
 # 9.2* Tunnocks----
 # Import the image
