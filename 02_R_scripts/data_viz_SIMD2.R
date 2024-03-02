@@ -385,6 +385,7 @@ p1 <- ggplot() +
     )
   )
 
+p1
 ggsave('./03_plots/nhs_boards_po_plot1.png', dpi = 300, height = 20, width = 15, units = 'cm')
 
 # gg_playback(
